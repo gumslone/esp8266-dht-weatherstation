@@ -20,8 +20,8 @@
 
     <script type="text/javascript">
 	<?php
-		$folder = '../sensors/logs/'; //sensor data folder
-		$sensor_folders = glob($folder.'/*',GLOB_ONLYDIR|GLOB_BRACE);
+		$scan_folder = '../sensors/logs/'; //sensor data folder
+		$sensor_folders = glob($scan_folder.'/*',GLOB_ONLYDIR|GLOB_BRACE);
 		if(count($sensor_folders)>0)
 		{
 			$sensors = array();
@@ -30,7 +30,21 @@
 				array_push($sensors, basename($folder));
 			}
 		}
-		echo 'var sensors = '.json_encode($sensors);
+		echo 'var sensors = '.json_encode($sensors).";\n";
+		
+		if(count($sensors)>0)
+		{
+						
+			foreach($sensors AS $sensor)
+			{
+				$files = array_diff(scandir($scan_folder.$sensor), array('.', '..'));
+				$files = array_reverse($files);
+				$files = array_values( $files );
+				$sensor_dates[$sensor] = $files;
+			}
+			
+		}
+		echo 'var sensor_dates = '.json_encode($sensor_dates).';';
 	?>
 		
 		$(document).ready(function() {
@@ -40,7 +54,7 @@
 			}
 			
 		});
-function create_chart(container,sensor)
+function create_chart(container,sensor,date='')
 {
 container = typeof container !== 'undefined' ? container : 'chart';
 
@@ -161,7 +175,7 @@ var options = {
 	}
 }
 
-	$.getJSON('./chart_data.php?sensor='+sensor+'', function(json) {
+	$.getJSON('./chart_data.php?sensor='+sensor+'&date='+date+'', function(json) {
 	
 		options.xAxis.categories = json[0];
 		options.series[0].data = json[1];
@@ -169,7 +183,7 @@ var options = {
 		chart = new Highcharts.Chart(options);
 		
 		
-		$('#sensor_'+sensor+' .last_measurement').html('<h4>Last measurement</h4>'+Highcharts.dateFormat('%Y-%m-%d (%H:%M) UTC',json[0][json[0].length-1]))+'';
+		$('#sensor_'+sensor+' .last_measurement').html('<b style="font-size:1.5em;">Last measurement</b><br/>'+Highcharts.dateFormat('%Y-%m-%d (%H:%M) UTC',json[0][json[0].length-1]))+'';
 		var last_temp = json[1][json[1].length-1];
 		var last_temp_html = '<span style="font-size:50px">'; 
 		if(last_temp < 18)
@@ -204,9 +218,33 @@ var options = {
 		last_humi_html += ''+ last_humi +'</span>';
 		$('#sensor_'+sensor+' .last_humidity').html(last_humi_html);
 		$('[data-toggle="tooltip"]').tooltip(); 
+		
+		
+		
+		var opt;
+		var sensor_date;
+		for (var i = 0; i < sensor_dates[sensor].length; i++) {
+			sensor_date = sensor_dates[sensor][i].split('_',1);
+			if(date == sensor_date)
+				opt += '<option value="'+sensor_date+'" selected>'+sensor_date+'</option>';
+			else
+				opt += '<option value="'+sensor_date+'">'+sensor_date+'</option>';
+			if(i>=366)
+			{
+				break;
+			}
+		}
+		$('#sensor_'+sensor+' .last_measurement').append('<br/><b>Selected date<b> <select onchange="javascript:change_date(this, '+sensor+');">'+opt+'</select>');
+		
 	});
+	
+	
 }
 
+function change_date(el,sensor)
+{
+	create_chart('sensor_chart_'+sensor+'',sensor,el.value);
+}
 
         </script>
         <script src="http://code.highcharts.com/highcharts.js"></script>
@@ -229,9 +267,6 @@ var options = {
 	      </div>
 	    </div>
 	  </div>
-	  
-	 	  
-	  
 	  
 	</div>
 		
